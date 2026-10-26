@@ -1,0 +1,1011 @@
+{
+  "name": "RAY | EA Job Outreach Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * *"
+            }
+          ]
+        }
+      },
+      "id": "7f701799-17d8-455b-80a7-c326088d3f16",
+      "name": "Daily Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -3616,
+        400
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "d5c2736e-40d5-4f92-877d-4a890d771eb3",
+      "name": "Run Manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -3616,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Node: \"Config\"\n// The ONLY place you need to edit to change sources, keywords, filters, models or limits.\n// The outreach prompt itself lives in the Google Sheet (\"Prompts\" tab) so it can be\n// changed without touching n8n. DEFAULT_PROMPT below is only a fallback.\n\nconst config = {\n  // Google Sheet that acts as the sales dashboard (the long ID in the sheet URL)\n  sheetId: '1-sF_b8OOTMyg7SB3Q2mX9K_6wNkgLwvSr_paK5PCvew',\n\n  // Search terms sent to every job board\n  searchTerms: ['executive assistant', 'administrative assistant'],\n\n  // Which boards to query. All three are public APIs with no LinkedIn involvement.\n  sources: {\n    remotive: true,   // remotive.com/api  (max 4 calls/day, attribution required)\n    jobicy: true,     // jobicy.com/api/v2 (max 1 poll/hour, attribution required)\n    himalayas: true,  // himalayas.app/jobs/api/search (attribution required)\n  },\n\n  // Only consider postings published in the last N days\n  maxAgeDays: 21,\n\n  // Safety cap on how many NEW postings go to the LLM per run (cost control)\n  maxNewJobsPerRun: 40,\n\n  // Rule based pre-filter (cheap, runs before any LLM call)\n  filters: {\n    // A title must match at least one of these to be considered relevant\n    titleInclude: [\n      '\\\\bexecutive\\\\s+(assistant|business\\\\s+partner|support)',\n      '\\\\b(administrative|admin)\\\\s+(assistant|support|coordinator)',\n      '\\\\bpersonal\\\\s+assistant\\\\b',\n      '\\\\bvirtual\\\\s+(executive\\\\s+)?assistant\\\\b',\n      '\\\\bassistant\\\\s+to\\\\s+(the\\\\s+)?(ceo|cfo|coo|cto|founder|co-founder|president|managing\\\\s+director|executive)',\n      '\\\\bEA\\\\b',\n    ],\n    // ...and none of these\n    titleExclude: [\n      'engineer', 'developer', 'medical', 'dental', 'clinical', 'nurse', 'pharmac',\n      'veterinar', 'legal\\\\s+assistant', 'paralegal', 'teaching', 'research\\\\s+assistant',\n      'lab(oratory)?\\\\s+assistant', 'sales\\\\s+(rep|representative)', 'intern\\\\b',\n    ],\n    // Hard reject when the TITLE itself says it is not remote\n    titleNonRemote: ['hybrid', 'on-?site', 'in[- ]office'],\n    // Reject postings that REQUIRE a language other than English\n    rejectIfOtherLanguageRequired: true,\n    // Reject descriptions that are not written in English\n    requireEnglishDescription: true,\n  },\n\n  // Claude settings\n  llm: {\n    validationModel: 'claude-haiku-5-5',  // fast and cheap classifier\n    outreachModel: 'claude-sonnet-5-5',   // better writing for the message\n    outreachMaxTokens: 700,\n    outreachTemperature: 0.7,\n  },\n\n  // Values available to the prompt as {{sender_name}}, {{sender_company}}, {{sender_pitch}}\n  sender: {\n    name: 'Franklin',\n    company: 'RAY',\n    pitch:\n      'RAY places pre-vetted, full-time remote Executive Assistants with founders and executives. ' +\n      'Candidates are screened for written English, judgement and tool fluency, and can start within weeks.',\n  },\n\n  // Fallback prompt used ONLY if the \"Prompts\" tab has no row marked Active = TRUE\n  defaultPrompt: {\n    version: 'fallback-v1',\n    system:\n      'You write short, warm, specific B2B outreach emails. Never invent facts about the company. ' +\n      'No buzzwords, no exclamation marks, no em dashes. Plain text only.',\n    user:\n      'Write a cold email from {{sender_name}} at {{sender_company}} to the hiring manager at {{company_name}}, ' +\n      'who is hiring a \"{{job_title}}\" ({{location}}).\\n\\n' +\n      'What we offer: {{sender_pitch}}\\n\\n' +\n      'Who the assistant would support: {{executive_supported}}\\n' +\n      'Key responsibilities from the posting: {{key_responsibilities}}\\n' +\n      'Tools mentioned: {{tools_mentioned}}\\n\\n' +\n      'Rules: under 120 words, reference two concrete details from the posting, one clear ask ' +\n      '(a 15 minute call), format as \"Subject: ...\" on the first line then a blank line then the body.\\n\\n' +\n      'Job description:\\n{{job_description}}',\n  },\n};\n\nreturn [{ json: config }];\n"
+      },
+      "id": "d12eb4a1-ca9c-4351-bc66-e40c2f4bfbee",
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3120,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1-sF_b8OOTMyg7SB3Q2mX9K_6wNkgLwvSr_paK5PCvew",
+          "mode": "list",
+          "cachedResultName": "EA-Outreach-Dashboard",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1-sF_b8OOTMyg7SB3Q2mX9K_6wNkgLwvSr_paK5PCvew/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1671311855,
+          "mode": "list",
+          "cachedResultName": "Prompts",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1-sF_b8OOTMyg7SB3Q2mX9K_6wNkgLwvSr_paK5PCvew/edit#gid=1671311855"
+        },
+        "options": {}
+      },
+      "id": "b687a9e4-751b-455e-aed2-2093b2d95bc2",
+      "name": "Read Prompt Library",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -2880,
+        528
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "qM8oTlbS6DUFLriZ",
+          "name": "Franklin-RAY-Google-Account-Project"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Config').first().json.sheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1497716631,
+          "mode": "list",
+          "cachedResultName": "Jobs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1-sF_b8OOTMyg7SB3Q2mX9K_6wNkgLwvSr_paK5PCvew/edit#gid=1497716631"
+        },
+        "options": {}
+      },
+      "id": "e1c43ad7-34f0-47cc-bdf0-583006f81659",
+      "name": "Read Saved Jobs",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -2640,
+        528
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "qM8oTlbS6DUFLriZ",
+          "name": "Franklin-RAY-Google-Account-Project"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Config').first().json.sheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Filtered Out",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "aa6db3d6-c264-4f1b-be19-67666f991e0c",
+      "name": "Read Filtered Out",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -2400,
+        528
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "qM8oTlbS6DUFLriZ",
+          "name": "Franklin-RAY-Google-Account-Project"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Node: \"Fetch & Normalize Jobs\"  (mode: Run Once for All Items)\n// Calls each enabled job board API, maps every posting to one common shape,\n// removes duplicates and drops anything already in the Sheet (Jobs or Filtered Out tabs).\n\nconst cfg = $('Config').first().json;\nconst http = this.helpers.httpRequest.bind(this.helpers);\nconst UA = 'RAY-EA-Outreach/1.0 (n8n workflow; contact via company website)';\n\n// ---------- helpers ----------\nfunction htmlToText(html) {\n  if (!html) return '';\n  return String(html)\n    .replace(/<\\s*(script|style)[^>]*>[\\s\\S]*?<\\s*\\/\\s*\\1\\s*>/gi, ' ')\n    .replace(/<\\s*br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\s*\\/\\s*(p|div|h[1-6]|ul|ol)\\s*>/gi, '\\n\\n')\n    .replace(/<\\s*li[^>]*>/gi, '\\n- ')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/&amp;/g, '&')\n    .replace(/&lt;/g, '<')\n    .replace(/&gt;/g, '>')\n    .replace(/&quot;/g, '\"')\n    .replace(/&#0?39;|&apos;|&rsquo;|&lsquo;/g, \"'\")\n    .replace(/&ldquo;|&rdquo;/g, '\"')\n    .replace(/&mdash;|&ndash;/g, '-')\n    .replace(/&#(\\d+);/g, (_, n) => String.fromCharCode(Number(n)))\n    .replace(/[ \\t]+/g, ' ')\n    .replace(/ *\\n */g, '\\n')\n    .replace(/\\n{3,}/g, '\\n\\n')\n    .trim();\n}\n\nfunction normUrl(u) {\n  if (!u) return '';\n  try {\n    const url = new URL(String(u).trim());\n    ['utm_source', 'utm_medium', 'utm_campaign', 'ref'].forEach((p) => url.searchParams.delete(p));\n    return url.toString().replace(/\\/$/, '');\n  } catch (e) {\n    return String(u).trim();\n  }\n}\n\nfunction toIso(d) {\n  if (d === undefined || d === null || d === '') return '';\n  const date = typeof d === 'number' ? new Date(d < 1e12 ? d * 1000 : d) : new Date(d);\n  return isNaN(date.getTime()) ? '' : date.toISOString();\n}\n\nfunction joinList(v) {\n  if (Array.isArray(v)) return v.filter(Boolean).join(', ');\n  return v ? String(v) : '';\n}\n\n// ---------- source adapters ----------\nconst adapters = {\n  async remotive(term) {\n    const body = await http({\n      method: 'GET', url: 'https://remotive.com/api/remote-jobs',\n      qs: { search: term, limit: 100 }, headers: { 'User-Agent': UA }, json: true, timeout: 30000,\n    });\n    return (body.jobs || []).map((j) => ({\n      source: 'Remotive',\n      sourceJobId: String(j.id),\n      url: j.url,\n      title: j.title,\n      company: j.company_name,\n      location: j.candidate_required_location ? `Remote (${j.candidate_required_location})` : 'Remote',\n      jobType: j.job_type || '',\n      salary: j.salary || '',\n      postedAt: toIso(j.publication_date),\n      descriptionHtml: j.description,\n    }));\n  },\n\n  async jobicy(term) {\n    const body = await http({\n      method: 'GET', url: 'https://jobicy.com/api/v2/remote-jobs',\n      qs: { count: 100, tag: term.slice(0, 50) }, headers: { 'User-Agent': UA }, json: true, timeout: 30000,\n    });\n    return (body.jobs || []).map((j) => ({\n      source: 'Jobicy',\n      sourceJobId: String(j.id),\n      url: j.url,\n      title: j.jobTitle,\n      company: j.companyName,\n      location: j.jobGeo ? `Remote (${j.jobGeo})` : 'Remote',\n      jobType: joinList(j.jobType),\n      salary: j.salaryMin ? `${j.salaryMin}-${j.salaryMax || ''} ${j.salaryCurrency || ''} ${j.salaryPeriod || ''}`.trim() : '',\n      postedAt: toIso(j.pubDate),\n      descriptionHtml: j.jobDescription || j.jobExcerpt,\n    }));\n  },\n\n  async himalayas(term) {\n    const body = await http({\n      method: 'GET', url: 'https://himalayas.app/jobs/api/search',\n      qs: { keyword: term, limit: 20 }, headers: { 'User-Agent': UA }, json: true, timeout: 30000,\n    });\n    const jobs = body.jobs || body.data || [];\n    return jobs.map((j) => {\n      const countries = joinList(j.locationRestrictions);\n      return {\n        source: 'Himalayas',\n        sourceJobId: String(j.guid || j.applicationLink || ''),\n        url: j.applicationLink || j.guid,\n        title: j.title,\n        company: j.companyName,\n        location: countries ? `Remote (${countries})` : 'Remote (Worldwide)',\n        jobType: j.employmentType || '',\n        salary: j.minSalary ? `${j.minSalary}-${j.maxSalary || ''} ${j.currency || ''} ${j.salaryPeriod || ''}`.trim() : '',\n        postedAt: toIso(j.pubDate),\n        descriptionHtml: j.description || j.excerpt,\n      };\n    });\n  },\n};\n\n// ---------- fetch ----------\nconst raw = [];\nconst errors = [];\nfor (const [name, enabled] of Object.entries(cfg.sources)) {\n  if (!enabled || !adapters[name]) continue;\n  for (const term of cfg.searchTerms) {\n    try {\n      const jobs = await adapters[name](term);\n      raw.push(...jobs);\n    } catch (e) {\n      // One board failing must not stop the others\n      errors.push(`${name} \"${term}\": ${e.message}`);\n    }\n  }\n}\n\n// ---------- normalize, dedupe, skip already processed ----------\nconst seen = new Set();\nfor (const nodeName of ['Read Saved Jobs', 'Read Filtered Out']) {\n  try {\n    for (const row of $(nodeName).all()) {\n      const u = normUrl(row.json['Job Posting URL']);\n      if (u) seen.add(u);\n    }\n  } catch (e) { /* tab empty or node not executed */ }\n}\n\nconst cutoff = Date.now() - cfg.maxAgeDays * 86400000;\nconst companyTitleKeys = new Set();\nconst out = [];\nconst stats = { fetched: raw.length, alreadyInSheet: 0, tooOld: 0, duplicates: 0, kept: 0, errors };\n\nfor (const j of raw) {\n  const url = normUrl(j.url);\n  if (!url || !j.title) continue;\n  if (seen.has(url)) { stats.alreadyInSheet++; continue; }\n  if (j.postedAt && new Date(j.postedAt).getTime() < cutoff) { stats.tooOld++; continue; }\n  // the same job is often cross-posted on several boards\n  const ctKey = `${String(j.company).toLowerCase().trim()}|${String(j.title).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()}`;\n  if (companyTitleKeys.has(ctKey)) { stats.duplicates++; continue; }\n  seen.add(url);\n  companyTitleKeys.add(ctKey);\n\n  const descriptionText = htmlToText(j.descriptionHtml);\n  out.push({\n    source: j.source,\n    sourceJobId: j.sourceJobId,\n    url,\n    title: String(j.title).trim(),\n    company: String(j.company || 'Unknown').trim(),\n    location: j.location,\n    jobType: j.jobType,\n    salary: j.salary,\n    postedAt: j.postedAt,\n    descriptionText,\n  });\n}\n\nout.sort((a, b) => (b.postedAt || '').localeCompare(a.postedAt || ''));\nstats.kept = out.length;\n\n// Stats are attached to every item so the execution log shows what happened\nreturn out.map((job) => ({ json: { ...job, _runStats: stats } }));\n"
+      },
+      "id": "15e1a0c2-1f7e-41d1-bd69-941a6fa3cdda",
+      "name": "Fetch & Normalize Jobs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2016,
+        528
+      ],
+      "executeOnce": true,
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Node: \"Rule Pre-Filter\"  (mode: Run Once for All Items)\n// Cheap deterministic checks BEFORE any LLM call:\n//   relevance  -> title must look like an Executive / Admin Assistant role\n//   remote     -> boards are remote-only, but reject titles that say hybrid / on-site\n//   english    -> description must be written in English and must not REQUIRE another language\n// Anything that passes still gets a final LLM check in the next step.\n\nconst cfg = $('Config').first().json;\nconst f = cfg.filters;\nconst rx = (list) => list.map((p) => new RegExp(p, 'i'));\nconst includeRx = rx(f.titleInclude);\nconst excludeRx = rx(f.titleExclude);\nconst nonRemoteRx = rx(f.titleNonRemote);\n\nconst LANGUAGES = [\n  'Spanish', 'French', 'German', 'Portuguese', 'Italian', 'Dutch', 'Japanese', 'Mandarin', 'Chinese',\n  'Cantonese', 'Korean', 'Arabic', 'Russian', 'Polish', 'Romanian', 'Greek', 'Hebrew', 'Turkish',\n  'Swedish', 'Norwegian', 'Danish', 'Finnish', 'Hindi', 'Tagalog', 'Filipino', 'Vietnamese', 'Thai',\n  'Indonesian', 'Czech', 'Hungarian', 'Ukrainian', 'Bulgarian', 'Croatian', 'Serbian', 'Slovak',\n];\nconst REQUIRED_WORDS = /(fluen|native|bilingual|proficien|must\\s+(speak|be\\s+able)|required|mandatory|written\\s+and\\s+(spoken|verbal)|speak|\\bC1\\b|\\bC2\\b)/i;\nconst OPTIONAL_WORDS = /(nice\\s+to\\s+have|a\\s+plus|is\\s+a\\s+bonus|preferred|advantage|desirable|beneficial)/i;\nconst EN_STOPWORDS = new Set(('the and to of a in for with you our is are will on as be this or your we an at by from ' +\n  'that have it all team work role who can about their experience support').split(' '));\n\nfunction englishRatio(text) {\n  const words = (text.toLowerCase().match(/[a-zà-ÿ]+/g) || []);\n  if (words.length < 40) return 1; // too short to judge, let the LLM decide\n  const hits = words.filter((w) => EN_STOPWORDS.has(w)).length;\n  return hits / words.length;\n}\n\nfunction languageRequirements(text) {\n  const sentences = text.split(/(?<=[.!?\\n])\\s+/);\n  const found = [];\n  let otherRequired = false;\n  for (const lang of ['English', ...LANGUAGES]) {\n    const langRx = new RegExp(`\\\\b${lang}\\\\b`, 'i');\n    const s = sentences.find((x) => langRx.test(x) && (REQUIRED_WORDS.test(x) || OPTIONAL_WORDS.test(x)));\n    if (!s) continue;\n    const optional = OPTIONAL_WORDS.test(s);\n    found.push(`${lang} (${optional ? 'preferred' : 'required'})`);\n    if (lang !== 'English' && !optional) otherRequired = true;\n  }\n  return { text: found.join('; '), otherRequired };\n}\n\n// Second dedupe guard: skip anything already in the Sheet even if the Fetch node\n// was pinned (pinned data bypasses the dedupe inside Fetch) or re-run manually.\nconst normUrl = (u) => String(u || '').trim().replace(/\\/$/, '');\nconst seen = new Set();\nfor (const nodeName of ['Read Saved Jobs', 'Read Filtered Out']) {\n  try {\n    for (const row of $(nodeName).all()) {\n      const u = normUrl(row.json['Job Posting URL']);\n      if (u) seen.add(u);\n    }\n  } catch (e) { /* tab empty */ }\n}\n\nconst passed = [];\nconst rejected = [];\n\nfor (const item of $input.all()) {\n  const job = item.json;\n  const key = normUrl(job.url);\n  if (!key || seen.has(key)) continue;\n  seen.add(key);\n  const reasons = [];\n\n  const isRelevant = includeRx.some((r) => r.test(job.title)) && !excludeRx.some((r) => r.test(job.title));\n  if (!isRelevant) reasons.push('Title is not an Executive / Admin Assistant role');\n\n  const isRemote = !nonRemoteRx.some((r) => r.test(job.title));\n  if (!isRemote) reasons.push('Title says hybrid or on-site');\n\n  const ratio = englishRatio(job.descriptionText);\n  const lang = languageRequirements(job.descriptionText);\n  const englishText = !f.requireEnglishDescription || ratio >= 0.08;\n  const isEnglish = englishText && !(f.rejectIfOtherLanguageRequired && lang.otherRequired);\n  if (!englishText) reasons.push('Description is not written in English');\n  if (f.rejectIfOtherLanguageRequired && lang.otherRequired) reasons.push(`Requires another language: ${lang.text}`);\n\n  const out = {\n    ...job,\n    languageRequirements: lang.text || 'None stated',\n    rules: { isRelevant, isRemote, isEnglish, englishRatio: Number(ratio.toFixed(3)) },\n    rejectStage: reasons.length ? 'Rules' : '',\n    rejectReason: reasons.join(' | '),\n    passedRules: reasons.length === 0,\n  };\n  (out.passedRules ? passed : rejected).push(out);\n}\n\n// Cost cap: only the newest N relevant jobs go to the LLM this run.\n// Overflow is NOT logged anywhere, so it is picked up again on the next run.\nconst toLlm = passed.slice(0, cfg.maxNewJobsPerRun);\n\nreturn [...toLlm, ...rejected].map((json) => ({ json }));\n"
+      },
+      "id": "cf13838c-b703-4190-b3de-c4d0c20e1b10",
+      "name": "Rule Pre-Filter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1776,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "Passed Rules?-cond",
+              "leftValue": "={{ $json.passedRules }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "be90e727-f85e-47db-8f07-2605c51f27c8",
+      "name": "Passed Rules?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -1536,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Node: \"Build Validation Request\"  (mode: Run Once for Each Item)\n// Asks Claude to make the final remote / English / relevance decision and to pull out\n// personalisation details for the outreach message. Forced tool use guarantees valid JSON.\n\nconst cfg = $('Config').first().json;\nconst job = $json;\n\nconst tool = {\n  name: 'record_assessment',\n  description: 'Record the assessment of one job posting.',\n  input_schema: {\n    type: 'object',\n    properties: {\n      is_remote: { type: 'boolean', description: 'True only if the role can be done fully remotely (location restrictions such as \"US only\" are fine). False if hybrid, on-site or regular office attendance is required.' },\n      remote_evidence: { type: 'string', description: 'Short quote or reason for the remote decision.' },\n      is_english_speaking: { type: 'boolean', description: 'True if the working language is English and no other language is REQUIRED. A second language listed as a plus is fine.' },\n      language_requirements: { type: 'string', description: 'All language requirements stated, e.g. \"Fluent English required; Spanish a plus\". \"None stated\" if none.' },\n      is_relevant: { type: 'boolean', description: 'True if this is genuinely an Executive Assistant, Administrative Assistant, Personal Assistant or Executive Business Partner role supporting a person or team. False for sales, engineering, medical, legal, teaching, research or recruiting roles.' },\n      relevance_evidence: { type: 'string', description: 'Short reason for the relevance decision.' },\n      executive_supported: { type: 'string', description: 'Who the assistant would support (e.g. \"CEO and co-founder\", \"VP of Sales\"). \"Not stated\" if unknown.' },\n      key_responsibilities: { type: 'array', items: { type: 'string' }, maxItems: 3, description: 'The three most specific responsibilities, paraphrased in under 12 words each.' },\n      tools_mentioned: { type: 'array', items: { type: 'string' }, description: 'Software or tools named in the posting.' },\n      confidence: { type: 'string', enum: ['high', 'medium', 'low'] },\n    },\n    required: ['is_remote', 'remote_evidence', 'is_english_speaking', 'language_requirements', 'is_relevant',\n      'relevance_evidence', 'executive_supported', 'key_responsibilities', 'tools_mentioned', 'confidence'],\n  },\n};\n\nconst requestBody = {\n  model: cfg.llm.validationModel,\n  max_tokens: 600,\n  system: 'You screen job postings for a recruitment team. Judge only from the posting text. Be strict and literal.',\n  tools: [tool],\n  tool_choice: { type: 'tool', name: 'record_assessment' },\n  messages: [{\n    role: 'user',\n    content:\n      `Job title: ${job.title}\\nCompany: ${job.company}\\nListed location: ${job.location}\\n` +\n      `Source board: ${job.source} (a remote-only job board)\\n\\nDescription:\\n${String(job.descriptionText).slice(0, 6000)}`,\n  }],\n};\n\nreturn { json: { ...job, requestBody } };\n"
+      },
+      "id": "40d3970d-e975-40d3-95b7-81b2f0118243",
+      "name": "Build Validation Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -960,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.requestBody) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 3,
+              "batchInterval": 2000
+            }
+          },
+          "timeout": 90000
+        }
+      },
+      "id": "f97c1c04-0d33-4229-b8f3-437d874fec2f",
+      "name": "Claude: Validate Job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -720,
+        512
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "kj5Qswyh5fv4hZp0",
+          "name": "RAY-AI-Antropic-Key"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Node: \"Parse Validation\"  (mode: Run Once for Each Item)\n// Merges Claude's verdict back onto the job. Qualified = remote AND English AND relevant.\n\nconst job = { ...$('Build Validation Request').item.json };\ndelete job.requestBody;\nconst res = $json;\n\nconst toolUse = Array.isArray(res.content) ? res.content.find((c) => c.type === 'tool_use') : null;\n\nif (!toolUse) {\n  // API error, timeout or unexpected shape: log it so it is visible, retry happens next run\n  const msg = (res.error && (res.error.message || JSON.stringify(res.error))) || 'No assessment returned';\n  return { json: { ...job, qualified: false, rejectStage: 'LLM error', rejectReason: String(msg).slice(0, 300), retryable: true } };\n}\n\nconst a = toolUse.input;\nconst reasons = [];\nif (!a.is_remote) reasons.push(`Not remote: ${a.remote_evidence}`);\nif (!a.is_english_speaking) reasons.push(`Not English-speaking: ${a.language_requirements}`);\nif (!a.is_relevant) reasons.push(`Not relevant: ${a.relevance_evidence}`);\n\nreturn {\n  json: {\n    ...job,\n    assessment: a,\n    languageRequirements: a.language_requirements || job.languageRequirements,\n    validationNotes: `Remote: ${a.remote_evidence} | Relevance: ${a.relevance_evidence} | Confidence: ${a.confidence}`,\n    qualified: reasons.length === 0,\n    rejectStage: reasons.length ? 'LLM validation' : '',\n    rejectReason: reasons.join(' | '),\n  },\n};\n"
+      },
+      "id": "8f77dfec-3fda-42fb-8204-cdc28add316a",
+      "name": "Parse Validation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "Qualified?-cond",
+              "leftValue": "={{ $json.qualified }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d1d2b1fc-4b86-4a94-b015-0dc3ce0a8b0c",
+      "name": "Qualified?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Node: \"Build Outreach Request\"  (mode: Run Once for Each Item)\n// Loads the prompt from the Sheet's \"Prompts\" tab so tone and wording can be changed\n// without editing this workflow. If several rows are Active, each job gets one of them\n// at random (simple A/B test); the chosen version is saved next to the message.\n\nconst cfg = $('Config').first().json;\nconst job = $json;\nconst a = job.assessment || {};\n\nlet prompts = [];\ntry {\n  prompts = $('Read Prompt Library').all()\n    .map((r) => r.json)\n    .filter((r) => String(r['Active']).trim().toUpperCase() === 'TRUE' && r['User Prompt'])\n    .map((r) => ({ version: String(r['Version'] || 'unnamed'), system: r['System Prompt'] || '', user: r['User Prompt'] }));\n} catch (e) { /* Prompts tab missing: fall back below */ }\n\nconst prompt = prompts.length\n  ? prompts[Math.floor(Math.random() * prompts.length)]\n  : cfg.defaultPrompt;\n\nconst vars = {\n  job_title: job.title,\n  company_name: job.company,\n  location: job.location,\n  job_description: String(job.descriptionText).slice(0, 5000),\n  executive_supported: a.executive_supported || 'Not stated',\n  key_responsibilities: (a.key_responsibilities || []).join('; ') || 'Not stated',\n  tools_mentioned: (a.tools_mentioned || []).join(', ') || 'None named',\n  language_requirements: job.languageRequirements,\n  source: job.source,\n  sender_name: cfg.sender.name,\n  sender_company: cfg.sender.company,\n  sender_pitch: cfg.sender.pitch,\n};\nconst fill = (t) => String(t).replace(/\\{\\{\\s*([a-z_]+)\\s*\\}\\}/gi, (m, k) => (k in vars ? vars[k] : m));\n\nconst requestBody = {\n  model: cfg.llm.outreachModel,\n  max_tokens: cfg.llm.outreachMaxTokens,\n  system: fill(prompt.system),\n  messages: [{ role: 'user', content: fill(prompt.user) }],\n};\n\nreturn { json: { ...job, promptVersion: prompt.version, requestBody } };\n"
+      },
+      "id": "0a59afc7-26cb-48d5-bb27-f580b51dfab9",
+      "name": "Build Outreach Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.requestBody) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 3,
+              "batchInterval": 2000
+            }
+          },
+          "timeout": 90000
+        }
+      },
+      "id": "52eb06dd-6b46-4d55-86c9-262100db2c5b",
+      "name": "Claude: Write Outreach",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        704,
+        192
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "kj5Qswyh5fv4hZp0",
+          "name": "RAY-AI-Antropic-Key"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Node: \"Format Sheet Row\"  (mode: Run Once for All Items)\n// Turns each job + Claude's message into one row for the \"Jobs\" tab.\n// The first six columns are exactly the ones the brief asks for; the rest help the sales rep.\n// If a message failed to generate, the job is skipped (not saved) so it is retried next run.\n\nconst MAX_CELL = 4000; // Sheets allows 50k per cell, but long cells make the dashboard unreadable\nconst rows = [];\n\n$input.all().forEach((item, i) => {\n  const job = $('Build Outreach Request').itemMatching(i).json;\n  const res = item.json;\n  const text = Array.isArray(res.content)\n    ? res.content.filter((c) => c.type === 'text').map((c) => c.text).join('\\n').trim()\n    : '';\n  if (!text) return;\n\n  const desc = job.descriptionText.length > MAX_CELL\n    ? job.descriptionText.slice(0, MAX_CELL) + '... [truncated, see posting URL]'\n    : job.descriptionText;\n\n  rows.push({\n    json: {\n      'Job Posting URL': job.url,\n      'Job Title': job.title,\n      'Company Name': job.company,\n      'Location': job.location,\n      'Job Description': desc,\n      'LLM-Generated Outreach Message': text.replace(/\\s*—\\s*/g, ', '),\n      'Status': 'New',\n      'Owner': '',\n      'Rep Notes': '',\n      'Date Posted': job.postedAt ? job.postedAt.slice(0, 10) : '',\n      'Date Added': new Date().toISOString().slice(0, 10),\n      'Source': job.source,\n      'Language Requirements': job.languageRequirements,\n      'Validation Notes': job.validationNotes,\n      'Prompt Version': job.promptVersion,\n    },\n  });\n});\n\nreturn rows;\n"
+      },
+      "id": "c275ed63-0fde-4f25-8ca7-dfc5eadc72d1",
+      "name": "Format Sheet Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        944,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Config').first().json.sheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Jobs",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Job Posting URL",
+              "displayName": "Job Posting URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Job Title",
+              "displayName": "Job Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Company Name",
+              "displayName": "Company Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Location",
+              "displayName": "Location",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Job Description",
+              "displayName": "Job Description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "LLM-Generated Outreach Message",
+              "displayName": "LLM-Generated Outreach Message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Owner",
+              "displayName": "Owner",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Rep Notes",
+              "displayName": "Rep Notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Date Posted",
+              "displayName": "Date Posted",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Date Added",
+              "displayName": "Date Added",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Language Requirements",
+              "displayName": "Language Requirements",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Validation Notes",
+              "displayName": "Validation Notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Prompt Version",
+              "displayName": "Prompt Version",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "63866efa-ec1f-40e2-9c8c-315651b83c45",
+      "name": "Save to Jobs Tab",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1184,
+        192
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "qM8oTlbS6DUFLriZ",
+          "name": "Franklin-RAY-Google-Account-Project"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Node: \"Format Rejected Row\"  (mode: Run Once for All Items)\n// Every posting that fails a check is logged in the \"Filtered Out\" tab with the reason.\n// This keeps the filter auditable and stops the same posting being re-checked every day.\n// LLM errors are NOT logged, so those postings are retried on the next run.\n\nreturn $input.all()\n  .map((i) => i.json)\n  .filter((j) => !j.retryable)\n  .map((j) => ({\n    json: {\n      'Job Posting URL': j.url,\n      'Job Title': j.title,\n      'Company Name': j.company,\n      'Location': j.location,\n      'Source': j.source,\n      'Rejected At': j.rejectStage,\n      'Reason': j.rejectReason,\n      'Language Requirements': j.languageRequirements,\n      'Date Checked': new Date().toISOString().slice(0, 10),\n    },\n  }));\n"
+      },
+      "id": "e51f37c7-b830-47ad-a1be-056b62b74acb",
+      "name": "Format Rejected Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        912
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Config').first().json.sheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Filtered Out",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Job Posting URL",
+              "displayName": "Job Posting URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Job Title",
+              "displayName": "Job Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Company Name",
+              "displayName": "Company Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Location",
+              "displayName": "Location",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Rejected At",
+              "displayName": "Rejected At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Reason",
+              "displayName": "Reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Language Requirements",
+              "displayName": "Language Requirements",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Date Checked",
+              "displayName": "Date Checked",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "1a7ecaaf-195d-49f1-9469-b3b054c8ef24",
+      "name": "Log to Filtered Out Tab",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        800,
+        912
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "qM8oTlbS6DUFLriZ",
+          "name": "Franklin-RAY-Google-Account-Project"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## 1. Setup and dedupe\nConfig holds every setting (Sheet ID, keywords, sources, models, limits).\nThe three Sheet reads load the prompt library and every URL already processed, so nothing is checked or messaged twice.",
+        "height": 460,
+        "width": 940,
+        "color": 7
+      },
+      "id": "c11f75fa-28e8-4bbd-a246-8a69db23aad3",
+      "name": "Note 20",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -3152,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 2. Collect and pre-filter\nPublic APIs only: Remotive, Jobicy, Himalayas (no LinkedIn, no HTML scraping).\nRules drop obvious mismatches for free before any LLM call.",
+        "height": 460,
+        "width": 680,
+        "color": 5
+      },
+      "id": "8641c2f6-2972-468b-9c62-eb6d1a04f116",
+      "name": "Note 21",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2064,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 3. Claude validates\nForced tool use returns strict JSON: remote, English-speaking, relevant, plus personalisation details.",
+        "height": 380,
+        "width": 940,
+        "color": 4
+      },
+      "id": "4415be92-edfb-479c-903a-5054e4d6f6bc",
+      "name": "Note 22",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1008,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 4. Claude writes outreach\nPrompt comes from the Sheet \"Prompts\" tab. Several Active rows = automatic A/B test.",
+        "height": 380,
+        "width": 940,
+        "color": 6
+      },
+      "id": "7a44ffd4-9bd5-47be-9210-f3b25e76e657",
+      "name": "Note 23",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        416,
+        -16
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 5. Audit trail\nEvery rejected posting is logged with its reason in \"Filtered Out\".",
+        "height": 300,
+        "width": 520,
+        "color": 3
+      },
+      "id": "2ff76e01-dcb1-4daa-863e-bf5587d93ced",
+      "name": "Note 24",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        512,
+        800
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily Schedule": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Manually": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Read Prompt Library",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Prompt Library": {
+      "main": [
+        [
+          {
+            "node": "Read Saved Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Saved Jobs": {
+      "main": [
+        [
+          {
+            "node": "Read Filtered Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Filtered Out": {
+      "main": [
+        [
+          {
+            "node": "Fetch & Normalize Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch & Normalize Jobs": {
+      "main": [
+        [
+          {
+            "node": "Rule Pre-Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rule Pre-Filter": {
+      "main": [
+        [
+          {
+            "node": "Passed Rules?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Passed Rules?": {
+      "main": [
+        [
+          {
+            "node": "Build Validation Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Rejected Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Validation Request": {
+      "main": [
+        [
+          {
+            "node": "Claude: Validate Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude: Validate Job": {
+      "main": [
+        [
+          {
+            "node": "Parse Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Validation": {
+      "main": [
+        [
+          {
+            "node": "Qualified?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qualified?": {
+      "main": [
+        [
+          {
+            "node": "Build Outreach Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Rejected Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Outreach Request": {
+      "main": [
+        [
+          {
+            "node": "Claude: Write Outreach",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude: Write Outreach": {
+      "main": [
+        [
+          {
+            "node": "Format Sheet Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Sheet Row": {
+      "main": [
+        [
+          {
+            "node": "Save to Jobs Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Rejected Row": {
+      "main": [
+        [
+          {
+            "node": "Log to Filtered Out Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "35dea3b3-3d33-4349-9cd5-5c4ac3c72ac3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp",
+    "instanceId": "d3191d3bc4bce81c00d45d3022b678cfcc4aa2a6c8613d83477ef9d252e28453"
+  },
+  "nodeGroups": [],
+  "id": "V1H9gcYxzrCtOwgR",
+  "tags": []
+}
